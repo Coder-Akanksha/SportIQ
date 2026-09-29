@@ -9,9 +9,14 @@ import { Film, CheckCircle2, ShieldAlert, Cpu } from 'lucide-react';
 
 export const VideoAnalysis = () => {
   const [analysisResult, setAnalysisResult] = useState(null);
+  const [liveFrameData, setLiveFrameData] = useState(null);
 
   const handleAnalysisComplete = (result) => {
     setAnalysisResult(result);
+  };
+
+  const handleFrameMetrics = (metrics) => {
+    setLiveFrameData(metrics);
   };
 
   const summary = analysisResult?.analysis || {
@@ -49,6 +54,31 @@ export const VideoAnalysis = () => {
   const pi = summary.final_performance_index;
   const shotStats = summary.shot_summary;
 
+  // Real-time synchronization with video scrubber / playback
+  const currentTotalShots = liveFrameData?.totalShots !== undefined && liveFrameData.totalShots > 0
+    ? liveFrameData.totalShots 
+    : (shotStats?.total_shots || 4);
+
+  const currentMadeShots = liveFrameData?.madeShots !== undefined && liveFrameData.totalShots > 0
+    ? liveFrameData.madeShots 
+    : (shotStats?.made_shots || 3);
+
+  const currentMissedShots = liveFrameData?.missedShots !== undefined && liveFrameData.totalShots > 0
+    ? liveFrameData.missedShots 
+    : (shotStats?.missed_shots || 1);
+
+  const currentAccuracy = liveFrameData?.accuracy !== undefined && liveFrameData.totalShots > 0
+    ? liveFrameData.accuracy 
+    : (shotStats?.accuracy_percentage || 75.0);
+
+  const currentViolations = liveFrameData?.violations !== undefined
+    ? liveFrameData.violations
+    : (summary?.illegal_extensions_detected || 0);
+
+  const currentPI = liveFrameData
+    ? Math.min(100, Math.max(50, Math.round(currentAccuracy * 0.4 + (liveFrameData.isIllegal ? 40 : 85) * 0.35 + 25)))
+    : (pi?.overall_pi || 82.4);
+
   return (
     <div className="space-y-6">
       
@@ -70,6 +100,7 @@ export const VideoAnalysis = () => {
           <VideoPlayerWithOverlay
             videoUrl={analysisResult?.annotatedVideoUrl || '/sample_data/sample_sports_clip.mp4'}
             shotEvents={shotStats?.recent_shots || []}
+            onFrameMetrics={handleFrameMetrics}
           />
         </div>
 
@@ -77,22 +108,22 @@ export const VideoAnalysis = () => {
         <div className="lg:col-span-5 space-y-6">
           {pi && (
             <PerformanceIndexGauge
-              score={pi.overall_pi || 82.4}
+              score={currentPI}
               grade={pi.grade || 'PRO'}
-              accuracyScore={pi.accuracy_score || 75.0}
+              accuracyScore={currentAccuracy}
               elbowStabilityScore={pi.elbow_stability_score || 86.0}
               kneeTimingScore={pi.knee_timing_score || 89.5}
-              illegalExtensions={summary.illegal_extensions_detected || 0}
+              illegalExtensions={currentViolations}
             />
           )}
 
           {shotStats && (
             <ShotOutcomeCounter
-              totalShots={shotStats.total_shots || 4}
-              madeShots={shotStats.made_shots || 3}
-              missedShots={shotStats.missed_shots || 1}
-              accuracy={shotStats.accuracy_percentage || 75.0}
-              recentShots={shotStats.recent_shots || []}
+              totalShots={currentTotalShots}
+              madeShots={currentMadeShots}
+              missedShots={currentMissedShots}
+              accuracy={currentAccuracy}
+              recentShots={liveFrameData?.recentShots || shotStats?.recent_shots || []}
             />
           )}
 

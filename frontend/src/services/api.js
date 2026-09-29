@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 30000,
+  timeout: 120000, // Increased global default timeout from 30s to 120s
 });
 
 // Request Interceptor: Attach JWT Bearer token if present
@@ -16,7 +16,7 @@ api.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
-// Response Interceptor: Handle 401 Unauthorized globally
+// Response Interceptor: Handle 401 Unauthorized and enhanced error formatting
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -29,6 +29,12 @@ api.interceptors.response.use(
         window.dispatchEvent(new Event('sporttrack_auth_expired'));
       }
     }
+
+    // Enhance timeout error messages for user-friendliness
+    if (error.code === 'ECONNABORTED' || (error.message && error.message.toLowerCase().includes('timeout'))) {
+      error.customMessage = 'The video analysis request timed out. High-frame-rate or high-resolution videos require extended processing time on the AI vision engine. Please check that the Python AI engine is active or try a shorter clip.';
+    }
+
     return Promise.reject(error);
   }
 );
@@ -51,10 +57,12 @@ export const shotsAPI = {
 };
 
 export const visionAPI = {
-  getHealth: () => api.get('/vision/health').then(res => res.data),
-  processFrame: (payload) => api.post('/vision/process-frame', payload).then(res => res.data),
+  getHealth: () => api.get('/vision/health', { timeout: 5000 }).then(res => res.data),
+  processFrame: (payload) => api.post('/vision/process-frame', payload, { timeout: 10000 }).then(res => res.data),
+  // Upload and analyze video with extended 5-minute (300,000ms) timeout for heavy computer vision workloads
   uploadVideo: (formData, onProgress) => api.post('/vision/upload-video', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 300000, // 5 minutes timeout for video processing
     onUploadProgress: (progressEvent) => {
       if (onProgress && progressEvent.total) {
         const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -62,7 +70,7 @@ export const visionAPI = {
       }
     }
   }).then(res => res.data),
-  computeKinematics: (payload) => api.post('/vision/compute-kinematics', payload).then(res => res.data),
+  computeKinematics: (payload) => api.post('/vision/compute-kinematics', payload, { timeout: 10000 }).then(res => res.data),
 };
 
 export const authAPI = {

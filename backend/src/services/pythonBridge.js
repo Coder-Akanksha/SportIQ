@@ -39,7 +39,7 @@ class PythonVisionBridge {
 
       const res = await axios.post(`${PYTHON_URL}/analyze-video`, form, {
         headers: form.getHeaders(),
-        timeout: 120000
+        timeout: 300000 // 5 minutes timeout for complete video computer vision processing
       });
       return res.data;
     } catch (error) {
